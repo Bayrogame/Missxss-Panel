@@ -56,8 +56,6 @@ python panel.py
 Programda herhangi bir hata bulursanız veya yeni bir özellik öneriniz varsa, program içindeki "Geri Bildirim" butonunu kullanabilir veya bana ulaşabilirsiniz.
 If you encounter any bugs or have feature suggestions, use the in-app "Feedback" button or contact me.
 
-💬 Discord: bayram173
-
 📺 Kick: https://kick.com/bayrogame
 
 Developed by (Bayrogame)
