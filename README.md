@@ -33,9 +33,11 @@ Bu projeyi kendi bilgisayarınızda açık kaynak olarak derlemek ve geliştirme
 If you want to run and develop this project open-source on your local machine:
 
 1. Projeyi bilgisayarınıza klonlayın / Clone the repository:
+
 git clone https://github.com/Bayrogame/Missxss-Panel.git
 
 2. Gerekli kütüphaneleri kurun / Install requirements:
+
 pip install -r requirements.txt
 
 3. Güvenlik ayarlarını yapın / Security setup:
@@ -45,6 +47,7 @@ Proje klasöründeki .env.example dosyasının adını .env olarak değiştirin.
 Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için .env dosyasına ekleyebilirsiniz.
 
 4. Programı başlatın / Run the app:
+
 python panel.py
 
 🐛 Destek & İletişim / Support & Contact
