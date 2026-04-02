@@ -39,11 +39,11 @@ If you want to run and develop this project open-source on your local machine:
    ```bash
    pip install -r requirements.txt
 
-4. Güvenlik ayarlarını yapın / Security setup:
-   ```bash
+3. Güvenlik ayarlarını yapın / Security setup:
+4. 
    Proje klasöründeki .env.example dosyasının adını .env olarak değiştirin.
    Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için ekleyebilirsiniz.
 
-5.Programı başlatın / Run the app:
+4.Programı başlatın / Run the app:
  ```bash
  python seslimissxss.py
