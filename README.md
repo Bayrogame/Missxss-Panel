@@ -36,20 +36,14 @@ If you want to run and develop this project open-source on your local machine:
    git clone [https://github.com/Bayrogame/Missxss-Panel.git](https://github.com/Bayrogame/Missxss-Panel.git)
 
 2. Gerekli kütüphaneleri kurun / Install requirements:
+   ```bash
    pip install -r requirements.txt
 
-3. Güvenlik ayarlarını yapın / Security setup:
-Proje klasöründeki .env.example dosyasının adını .env olarak değiştirin.
-Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için ekleyebilirsiniz.
+4. Güvenlik ayarlarını yapın / Security setup:
+   ```bash
+   Proje klasöründeki .env.example dosyasının adını .env olarak değiştirin.
+   Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için ekleyebilirsiniz.
 
-4.Programı başlatın / Run the app:
-python seslimissxss.py
-
-                              🐛 Destek & İletişim / Support & Contact
-Programda herhangi bir hata bulursanız veya yeni bir özellik öneriniz varsa, program içindeki "Geri Bildirim" butonunu kullanabilir veya bana ulaşabilirsiniz.
-If you encounter any bugs or have feature suggestions, use the in-app "Feedback" button or contact me.
-
-💬 Discord: bayrogame
-📺 Kick: kick.com/bayrogame
-
-Developed by (Bayrogame)
+5.Programı başlatın / Run the app:
+ ```bash
+ python seslimissxss.py
