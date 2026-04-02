@@ -1,4 +1,5 @@
 🎙️ Missxss Gelişmiş Panel v2.1
+
 Yapay zeka destekli, sesli komutlarla çalışan gelişmiş yayın ve Discord yönetim paneli. Sadece "Miss" diyerek yayın kategorinizi değiştirebilir, klip alabilir, Discord odalarını yönetebilir ve yapay zeka botunuzu kontrol edebilirsiniz.
 
 An advanced, voice-controlled stream and Discord management panel powered by AI. Just say "Miss" to change stream categories, take clips, manage Discord rooms, and control your AI bot.
