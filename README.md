@@ -42,6 +42,7 @@ If you want to run and develop this project open-source on your local machine:
 3. Güvenlik ayarlarını yapın / Security setup:
 
 Proje klasöründeki .env.example dosyasının adını .env olarak değiştirin.
+
 Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için ekleyebilirsiniz.
 
 4.Programı başlatın / Run the app:
