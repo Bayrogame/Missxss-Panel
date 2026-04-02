@@ -52,6 +52,7 @@ Opsiyonel: Kendi Discord Webhook URL'nizi geri bildirim sistemi için .env dosya
 python panel.py
 
 🐛 Destek & İletişim / Support & Contact
+
 Programda herhangi bir hata bulursanız veya yeni bir özellik öneriniz varsa, program içindeki "Geri Bildirim" butonunu kullanabilir veya bana ulaşabilirsiniz.
 If you encounter any bugs or have feature suggestions, use the in-app "Feedback" button or contact me.
 
