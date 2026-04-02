@@ -1,4 +1,4 @@
-🎙️ Missxss Gelişmiş Panel v2.1
+🎙️ Missxss Sesli Kontrol Paneli v2.1
 
 Yapay zeka destekli, sesli komutlarla çalışan gelişmiş yayın ve Discord yönetim paneli. Sadece "Miss" diyerek yayın kategorinizi değiştirebilir, klip alabilir, Discord odalarını yönetebilir ve yapay zeka botunuzu kontrol edebilirsiniz.
 
