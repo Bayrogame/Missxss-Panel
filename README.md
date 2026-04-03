@@ -27,6 +27,8 @@ Sağ taraftaki Releases bölümüne tıklayın.
 
 En son sürümdeki .exe dosyasını indirin.
 
+Realses bölümünü bulamazsanız direkt burdanda indire bilirsiniz : https://github.com/Bayrogame/Missxss-Panel/releases/download/v2.1/Gelismis.Missxss.Panel.exe
+
 Çalıştırın ve keyfini çıkarın! (Program gerekli güvenlik anahtarlarını sizin için ilk açılışta otomatik oluşturacaktır).
 
 🛠️ Geliştiriciler İçin Kurulum (For Developers)
