@@ -5,8 +5,6 @@
   <p><i>AI-Powered Voice-Controlled Stream and Discord Management Panel</i></p>
 </div>
 
----
-
 ## 🌟 Hakkında / About
 
 **🇹🇷 Türkçe:**
