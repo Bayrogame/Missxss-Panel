@@ -15,6 +15,7 @@ import asyncio
 import edge_tts
 import warnings 
 import subprocess
+from datetime import datetime
 from dotenv import load_dotenv
 
 try:
@@ -36,9 +37,9 @@ except Exception:
 BASE_URL = "https://api.missxss.com.tr"
 
 # --- GÜNCELLEME SİSTEMİ BİLGİLERİ (BURAYI KENDİNE GÖRE DÜZENLE) ---
-APP_VERSION = "2.1"
-GITHUB_OWNER = "bayrogame" # GitHub kullanıcı adını buraya yaz
-GITHUB_REPO = "Missxss-Panel" # GitHub'da oluşturduğun deponun (repository) adını yaz
+APP_VERSION = "2.2"
+GITHUB_OWNER = "bayrogame" 
+GITHUB_REPO = "Missxss-Panel" 
 
 def resource_path(relative_path):
     try: base_path = sys._MEIPASS
@@ -49,10 +50,8 @@ def resource_path(relative_path):
 load_dotenv(resource_path(".env"))
 
 gizli_anahtar_str = os.getenv("GIZLI_ANAHTAR")
-# Feedback Webhook URL'si
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-# Eğer yazılımcı .env dosyasını oluşturmayı unutmuşsa uyar ve kapat
 if not gizli_anahtar_str or gizli_anahtar_str == "kendi_gizli_anahtarini_buraya_yaz":
     print("⚠️ KRİTİK HATA: Geçerli bir GIZLI_ANAHTAR bulunamadı!")
     print("Lütfen '.env.example' dosyasını kopyalayıp adını '.env' yapın ve içine geçerli bir Fernet anahtarı girin.")
@@ -92,6 +91,9 @@ KOMUT_HARITASI = {
     "kalkan modunu kapat": {"endpoint": "/v1/shield-mode", "payload": {"mode": "off"}},
     "kalkanı kapat": {"endpoint": "/v1/shield-mode", "payload": {"mode": "off"}},
     "kalkan kapat": {"endpoint": "/v1/shield-mode", "payload": {"mode": "off"}},
+    # SESLİ KOMUTTA GÜVENLİK KEMERİ: HER ZAMAN SADECE 1 KİŞİYİ BANLAR
+    "son takipçiyi banla": {"endpoint": "/v1/ban-recent-followers", "payload": {"action": "ban", "offset": 1, "count": 1, "reason": "Panel - Sesli Komut"}},
+    "son takip edeni banla": {"endpoint": "/v1/ban-recent-followers", "payload": {"action": "ban", "offset": 1, "count": 1, "reason": "Panel - Sesli Komut"}},
     
     "write from my account": {"endpoint": "/v1/send-message", "dinamik": "message"},
     "streamer message": {"endpoint": "/v1/send-message", "dinamik": "message"},
@@ -115,6 +117,7 @@ KOMUT_HARITASI = {
     "shield on": {"endpoint": "/v1/shield-mode", "payload": {"mode": "on"}},
     "shield mode off": {"endpoint": "/v1/shield-mode", "payload": {"mode": "off"}},
     "shield off": {"endpoint": "/v1/shield-mode", "payload": {"mode": "off"}},
+    "ban last follower": {"endpoint": "/v1/ban-recent-followers", "payload": {"action": "ban", "offset": 1, "count": 1, "reason": "Panel - Voice Command"}},
 }
 
 def get_config_path():
@@ -175,7 +178,7 @@ LANG_DICT = {
         "c_cmd": " Özel Komutlar", "guide": " Komut Kılavuzu", "hotkey": " Kısayol Tuşları",
         "feedback": " Geri Bildirim", "fb_title": "Geri Bildirim / Öneri Gönder", "fb_ph": "Bulduğunuz bir hatayı, önerinizi veya mesajınızı buraya yazın...", "fb_send": " Gönder", "fb_sent": "✅ Geri bildiriminiz başarıyla iletildi! Teşekkürler.", "fb_err": "⚠️ Mesaj iletilemedi, internet bağlantınızı kontrol edin.", "fb_empty": "⚠️ Lütfen boş mesaj göndermeyin.",
         "prod": "Yapımcı : Bayrogame  ", "lang_lbl": " Dil / Language",
-        "tab_main": "Ana Panel", "tab_dc": "Discord Kontrolcü", "tab_stream": "Yayın Kontrolcü",
+        "tab_main": "Ana Panel", "tab_dc": "Discord Kontrolcü", "tab_stream": "Yayın Kontrolcü", "tab_watch": "İzleme Süreleri",
         "msg_title": " Mesajlaşma", "pub_msg": "Yayıncı Mesajı", "bot_msg": "Bot Mesajı", 
         "msg_ph": "Gönderilecek mesajı buraya yazın...", "send": " Gönder",
         "stream_info": " Yayın Bilgisi", "new_cat": "Yeni Kategori (Örn: sohbet, valorant)",
@@ -185,6 +188,9 @@ LANG_DICT = {
         "pause": " DURDUR", "skip": " GEÇ", "clear_chat": " SOHBETİ TEMİZLE",
         "mod": " Manuel Moderasyon", "shield": "Kalkan Modu", "usr_ph": "İşlem yapılacak kullanıcı adı...",
         "ban": " BANLA", "timeout": " SUSTUR", "unban": " BAN KALDIR", "load_id": " Son ID'leri Yükle",
+        "ban_last": " Son Takipçileri Banla",
+        "ban_voice_warn": "🎙️ Uyarı: Sesli komut ile sadece 1 kişi banlanır.",
+        "apply_recent": " İşlemi Uygula",
         "srv_stat": " Sunucu Durumu Sorgula", "srv_ph": "Sunucu (Guild) ID...", "query": " Sorgula",
         "dc_msg": " Discord Kanala Mesaj Gönder", "ch_ph": "Kanal ID (Zorunlu)", "n_msg_ph": "Normal Mesaj Metni...",
         "emb_title": "Embed Başlığı", "emb_desc": "Embed Açıklaması...", "color_ph": "Renk Kodu",
@@ -192,32 +198,65 @@ LANG_DICT = {
         "mute_all": " Herkesi Sustur", "unmute_all": " Herkesin Sesini Aç", "pull_title": " Herkesi Bu Kanala Çek",
         "pull_ph": "Herkesin Çekileceği Hedef Ses Kanalı ID'si...", "pull_btn": " Herkesi Çek",
         "live_stats": " Canlı Yayın İstatistikleri", "live_track": "Canlı Takip (30sn)",
-        "viewers": "İzleyici:", "followers": "Takipçi:", "category": "Kategori:",
+        "viewers": "İzleyici:", "followers": "Takipçi:", "category": "Kategori:", "conn": "Bağlantı:",
         "get_meta": " Yayın Bilgilerini Getir", "get_meta_btn": " Bilgileri Sorgula",
         "get_subs": " Kick Abonelerini Getir", "inc_exp": "Süresi Bitenleri Dahil Et",
         "lim_ph": "Limit (Örn: 20)", "off_ph": "Offset (Örn: 0)", "get_act": " Son Aktiviteleri Getir",
         "get_mod": " Moderasyon Kayıtlarını Getir", "ai_title": " AI Chatbot Kontrolü",
         "ai_clear": " Hafızayı Temizle", "ai_send": " Seçili Prompt'u Gönder", "sys_log": " Sistem Kayıtları",
+        
+        # --- İZLEME SÜRELERİ & BASİT EKRAN (TR) ---
+        "watch_title": " İzleme Süresi Yönetimi",
+        "watch_user_ph": "Kullanıcı Adı/ID...",
+        "watch_amount_ph": "Miktar (dk)...",
+        "watch_day_ph": "Tarih (YYYY-MM-DD)",
+        "watch_btn": " İşlemi Uygula",
+        "watch_mode_add": "Ekle", "watch_mode_remove": "Çıkar",
+        "log_watch": "İzleme Süresi İşlemi",
+        "get_watch_title": " İzleme Süresi Sorgula",
+        "watch_date_from_ph": "Başlangıç (YYYY-MM-DD)",
+        "watch_date_to_ph": "Bitiş (YYYY-MM-DD)",
+        "get_watch_btn": " Süreyi Sorgula",
+        "top_watch_title": " Top İzleyici Sıralaması",
+        "top_limit_ph": "Limit (Def: 20)",
+        "top_offset_ph": "Offset (Def: 0)",
+        "top_watch_btn": " Sıralamayı Getir",
+        "date_hint": "💡 İpucu: Tarihleri Yıl-Ay-Gün şeklinde girmelisin. (Örnek: 2026-04-18)",
+        "show_details": "Tüm Detayları Göster",
+        "detailed_search": "Detaylı Arama",
+        
+        "sv_user": "👤 Kullanıcı:", "sv_watch_time": "⏱️ İzleme Süresi:", "sv_msg_count": "💬 Mesaj Sayısı:",
+        "sv_is_live": "📡 Yayında Mı:", "sv_cat": "🎮 Kategori:", "sv_viewers": "👥 İzleyici:",
+        "sv_followers": "❤️ Takipçi:", "sv_title": "📝 Başlık:", "sv_yes": "Evet 🟢", "sv_no": "Hayır 🔴",
+        "sv_no_act": "Yeni aktivite yok.", "sv_empty": "Liste boş.", "sv_success": "✅ İşlem başarıyla tamamlandı.",
+        "sv_err": "Veri işlenirken hata oluştu.", "sv_details": "Detaylı görünüm için aşağıdaki kutucuğu işaretleyin.",
+        "sv_not_found": "Veri bulunamadı.", "sv_min": "dk", "sv_hr": "saat", "sv_day": "gün", "sv_mo": "ay", "sv_yr": "yıl", "sv_unknown": "Bilinmiyor",
+        "sv_follower_type": "Takipçi", "sv_sub_type": "Abone", "sv_sub_renew": "Abonelik Yenileme", "sv_sub_gift": "Hediye Abone",
+        
+        "conn_warn_title": "⚠️ Bağlantı Süresi Uyarısı",
+        "conn_warn_txt": "Kick bağlantınızın üzerinden 25 günden fazla zaman geçmiş!\nLütfen missxss.com adresinden yayıncı girişi yaparak\nbağlantınızı yenileyin.",
+        "understood": "Anladım",
+        
         "eula_title": "YASAL UYARI / LEGAL WARNING", 
-        "eula_txt": "Bu yazılımın yasa dışı veya kötü amaçlı kullanımından\nkaynaklanan her türlü hukuki ve cezai sorumluluk\ntamamen kullanıcıya aittir.\n\nAny legal and penal responsibility arising from\nthe illegal or malicious use of this software\nbelongs entirely to the user.",
+        "eula_txt": "Bu yazılımın yasa dışı veya kötü amaçlı kullanımından\nkaynaklanan her türlü hukuki ve cezai sorumluluk\ntamamen kullanıcıya aittir.",
         "eula_btn": "Onaylıyorum / Accept", "palette": " Renk Paleti", "ready_colors": "Hazır Renkler",
         "close": "Kapat", "query_res": "Sorgu Sonucu: ", "err_api": "⚠️ Lütfen önce soldaki menüden API anahtarınızı girip kaydedin!",
         "start_msg": f"Missxss Gelişmiş Panel v{APP_VERSION} başlatıldı. Bayrogame gururla sunar...", "loading": "Yükleniyor...", "no_prompt": "Gömülü prompt bulunamadı",
         "hk_toggle_mic": "Sesli Asistan Aç/Kapat", "hk_clear_chat": "Sohbeti Temizle", "hk_take_clip": "Hızlı Klip Al (30 Saniye)",
         "hk_toggle_shield": "Kalkan Modu Aç/Kapat", "hk_play_music": "Müzik Başlat", "hk_stop_music": "Müzik Durdur",
-        "hk_skip_music": "Müzik Geç", "hk_clear_ai": "AI Hafızasını Temizle", "hk_desc": "Oyun içindeyken bile programı kontrol etmenizi sağlar.",
+        "hk_skip_music": "Müzik Geç", "hk_clear_ai": "AI Hafızasını Temizle", "hk_action_last": "Son Takipçi Ban (Arayüz Ayarını Uygular)", "hk_desc": "Oyun içindeyken bile programı kontrol etmenizi sağlar.",
         "hk_set": "Tuş Ata", "hk_del": "Sil", "hk_unassigned": "Atanmadı", "hk_press": "Tuşa Basın...",
         "c_cmd_desc": "Asistan kelimeyi yanlış anlıyorsa veya farklı bir kelime kullanmak istiyorsan eşleştir.",
         "c_cmd_ph": "Söylenen (Örn: kılıf al / kesit al)", "c_cmd_add": "Ekle", "c_cmd_triggers": "tetikler:",
         "cmd_klip_al": "klip al", "cmd_kategori_değiştir": "kategori değiştir", "cmd_başlık": "başlık",
         "cmd_sohbeti_temizle": "sohbeti temizle", "cmd_müzik_başlat": "müzik başlat", "cmd_müzik_dur": "müzik dur",
         "cmd_müzik_geç": "müzik geç", "cmd_kalkanı_aç": "kalkanı aç", "cmd_kalkanı_kapat": "kalkanı kapat",
-        "cmd_herkesi_sustur": "herkesi sustur", "cmd_herkesin_sesini_aç": "herkesin sesini aç", "cmd_herkesi_bu_kanala_çek": "herkesi bu kanala çek",
+        "cmd_herkesi_sustur": "herkesi sustur", "cmd_herkesin_sesini_aç": "herkesin sesini aç", "cmd_herkesi_bu_kanala_çek": "herkesi bu kanala çek", "cmd_son_takipçiyi_banla": "son takipçiyi banla",
         "log_msg_sent": "Mesaj Gönderiliyor", "log_title_upd": "Başlık Güncelleniyor",
         "log_cat_upd": "Kategori Güncelleniyor", "log_clip": "Klip Alınıyor",
         "log_clear": "Sohbet Temizleniyor", "log_play": "Şarkı Başlatılıyor",
         "log_stop": "Şarkı Durduruluyor", "log_skip": "Şarkı Geçiliyor",
-        "log_ban": "Banlanıyor", "log_timeout": "Susturuluyor", "log_unban": "Ban Kaldırılıyor",
+        "log_ban": "Banlanıyor", "log_timeout": "Susturuluyor", "log_unban": "Ban Kaldırılıyor", "log_ban_last": "Toplu Ban İşlemi", "log_timeout_last": "Toplu Susturma İşlemi",
         "log_shield_on": "Kalkan Modu Açılıyor", "log_shield_off": "Kalkan Modu Kapatılıyor",
         "log_discord_msg": "Discord Mesajı", "log_discord_mute": "Herkes Susturuluyor",
         "log_discord_unmute": "Herkesin Sesi Açılıyor", "log_discord_pull": "Herkes Çekiliyor",
@@ -246,7 +285,8 @@ LANG_DICT = {
 
 🛡️ GÜVENLİK VE KALKAN
 • Kalkan modunu aç/kapat için: "Miss kalkan modunu aç" veya "Miss kalkanı kapat"
-• ⚠️ ÖNEMLİ UYARI: "Ban" ve "Sustur/Time Out" komutları yanlışlıkla kullanım riskine karşı SESLİ KOMUTA KAPALIDIR."""
+• Son takipçiyi sesten banlamak için (Güvenlik sebebiyle her zaman 1 kişi banlar): "Miss son takipçiyi banla" veya "Miss son takip edeni banla"
+• ⚠️ ÖNEMLİ UYARI: Hedefli "Ban" ve "Sustur/Time Out" komutları yanlışlıkla kullanım riskine karşı SESLİ KOMUTA KAPALIDIR."""
     },
     "en": {
         "api_key": " API Key Settings", "api_ph": "Enter your API Key...", "save": " Save",
@@ -256,7 +296,7 @@ LANG_DICT = {
         "c_cmd": " Custom Commands", "guide": " Command Guide", "hotkey": " Hotkeys",
         "feedback": " Feedback", "fb_title": "Send Feedback / Suggestion", "fb_ph": "Type your suggestions, bug reports, or thoughts here...", "fb_send": " Send", "fb_sent": "✅ Feedback sent successfully! Thank you.", "fb_err": "⚠️ Failed to send. Please check your internet connection.", "fb_empty": "⚠️ Please do not send an empty message.",
         "prod": "Producer : Bayrogame  ", "lang_lbl": " Language / Dil",
-        "tab_main": "Main Panel", "tab_dc": "Discord Control", "tab_stream": "Stream Control",
+        "tab_main": "Main Panel", "tab_dc": "Discord Control", "tab_stream": "Stream Control", "tab_watch": "Watch Times",
         "msg_title": " Messaging", "pub_msg": "Streamer Msg", "bot_msg": "Bot Msg", 
         "msg_ph": "Type your message here...", "send": " Send",
         "stream_info": " Stream Info", "new_cat": "New Category (e.g. Just Chatting)",
@@ -266,6 +306,9 @@ LANG_DICT = {
         "pause": " PAUSE", "skip": " SKIP", "clear_chat": " CLEAR CHAT",
         "mod": " Manual Moderation", "shield": "Shield Mode", "usr_ph": "Target username...",
         "ban": " BAN", "timeout": " TIMEOUT", "unban": " UNBAN", "load_id": " Load Last IDs",
+        "ban_last": " Ban Recent Followers",
+        "ban_voice_warn": "🎙️ Warning: Voice command only bans 1 person.",
+        "apply_recent": " Apply Action",
         "srv_stat": " Server Status Query", "srv_ph": "Server (Guild) ID...", "query": " Query",
         "dc_msg": " Send Discord Message", "ch_ph": "Channel ID (Required)", "n_msg_ph": "Normal Message Text...",
         "emb_title": "Embed Title", "emb_desc": "Embed Description...", "color_ph": "Color Code",
@@ -273,32 +316,65 @@ LANG_DICT = {
         "mute_all": " Mute All", "unmute_all": " Unmute All", "pull_title": " Pull Everyone Here",
         "pull_ph": "Target Voice Channel ID to pull to...", "pull_btn": " Pull Everyone",
         "live_stats": " Live Stream Stats", "live_track": "Live Tracking (30s)",
-        "viewers": "Viewers:", "followers": "Followers:", "category": "Category:",
+        "viewers": "Viewers:", "followers": "Followers:", "category": "Category:", "conn": "Connection:",
         "get_meta": " Get Stream Meta", "get_meta_btn": " Query Info",
         "get_subs": " Get Kick Subscribers", "inc_exp": "Include Expired",
         "lim_ph": "Limit (e.g. 20)", "off_ph": "Offset (e.g. 0)", "get_act": " Get Recent Activity",
         "get_mod": " Get Moderation Logs", "ai_title": " AI Chatbot Control",
         "ai_clear": " Clear Memory", "ai_send": " Send Selected Prompt", "sys_log": " System Logs",
+        
+        # --- İZLEME SÜRELERİ & BASİT EKRAN (EN) ---
+        "watch_title": " Watch Time Management",
+        "watch_user_ph": "Username/ID...",
+        "watch_amount_ph": "Amount (min)...",
+        "watch_day_ph": "Date (YYYY-MM-DD)",
+        "watch_btn": " Apply Action",
+        "watch_mode_add": "Add", "watch_mode_remove": "Remove",
+        "log_watch": "Watch Time Action",
+        "get_watch_title": " Query Watch Time",
+        "watch_date_from_ph": "Start (YYYY-MM-DD)",
+        "watch_date_to_ph": "End (YYYY-MM-DD)",
+        "get_watch_btn": " Query Time",
+        "top_watch_title": " Top Viewers Ranking",
+        "top_limit_ph": "Limit (Def: 20)",
+        "top_offset_ph": "Offset (Def: 0)",
+        "top_watch_btn": " Get Ranking",
+        "date_hint": "💡 Hint: Enter dates as Year-Month-Day. (Example: 2026-04-18)",
+        "show_details": "Show All Details",
+        "detailed_search": "Detailed Search",
+        
+        "sv_user": "👤 User:", "sv_watch_time": "⏱️ Watch Time:", "sv_msg_count": "💬 Message Count:",
+        "sv_is_live": "📡 Is Live:", "sv_cat": "🎮 Category:", "sv_viewers": "👥 Viewers:",
+        "sv_followers": "❤️ Followers:", "sv_title": "📝 Title:", "sv_yes": "Yes 🟢", "sv_no": "No 🔴",
+        "sv_no_act": "No recent activity.", "sv_empty": "List is empty.", "sv_success": "✅ Action completed successfully.",
+        "sv_err": "Error processing data.", "sv_details": "Check the box below for detailed view.",
+        "sv_not_found": "Data not found.", "sv_min": "min", "sv_hr": "hr", "sv_day": "d", "sv_mo": "mo", "sv_yr": "yr", "sv_unknown": "Unknown",
+        "sv_follower_type": "Follower", "sv_sub_type": "Subscriber", "sv_sub_renew": "Sub Renewal", "sv_sub_gift": "Gift Sub",
+        
+        "conn_warn_title": "⚠️ Connection Time Warning",
+        "conn_warn_txt": "It has been more than 25 days since your Kick connection!\nPlease log in as a streamer at missxss.com\nto renew your connection.",
+        "understood": "Understood",
+        
         "eula_title": "LEGAL WARNING / YASAL UYARI", 
-        "eula_txt": "Any legal and penal responsibility arising from\nthe illegal or malicious use of this software\nbelongs entirely to the user.\n\nBu yazılımın yasa dışı veya kötü amaçlı kullanımından\nkaynaklanan her türlü hukuki ve cezai sorumluluk\ntamamen kullanıcıya aittir.",
+        "eula_txt": "Any legal and penal responsibility arising from\nthe illegal or malicious use of this software\nbelongs entirely to the user.",
         "eula_btn": "Accept / Onaylıyorum", "palette": " Color Palette", "ready_colors": "Ready Colors",
         "close": "Close", "query_res": "Query Result: ", "err_api": "⚠️ Please enter and save your API key from the left menu first!",
         "start_msg": f"Missxss Advanced Panel v{APP_VERSION} started. Proudly presented by Bayrogame...", "loading": "Loading...", "no_prompt": "No embedded prompt found",
         "hk_toggle_mic": "Toggle Voice Assistant", "hk_clear_chat": "Clear Chat", "hk_take_clip": "Quick Clip (30 Seconds)",
         "hk_toggle_shield": "Toggle Shield Mode", "hk_play_music": "Play Music", "hk_stop_music": "Stop Music",
-        "hk_skip_music": "Skip Music", "hk_clear_ai": "Clear AI Memory", "hk_desc": "Allows you to control the program even while in-game.",
+        "hk_skip_music": "Skip Music", "hk_clear_ai": "Clear AI Memory", "hk_action_last": "Recent Follower Ban (Uses UI Settings)", "hk_desc": "Allows you to control the program even while in-game.",
         "hk_set": "Set Key", "hk_del": "Del", "hk_unassigned": "Unassigned", "hk_press": "Press Key...",
         "c_cmd_desc": "Map a word if the assistant misunderstands or if you want to use a custom word.",
         "c_cmd_ph": "Voice (e.g. record this)", "c_cmd_add": "Add", "c_cmd_triggers": "triggers:",
         "cmd_klip_al": "take clip", "cmd_kategori_değiştir": "change category", "cmd_başlık": "change title",
         "cmd_sohbeti_temizle": "clear chat", "cmd_müzik_başlat": "play music", "cmd_müzik_dur": "stop music",
         "cmd_müzik_geç": "skip music", "cmd_kalkanı_aç": "shield on", "cmd_kalkanı_kapat": "shield off",
-        "cmd_herkesi_sustur": "mute all", "cmd_herkesin_sesini_aç": "unmute all", "cmd_herkesi_bu_kanala_çek": "pull everyone",
+        "cmd_herkesi_sustur": "mute all", "cmd_herkesin_sesini_aç": "unmute all", "cmd_herkesi_bu_kanala_çek": "pull everyone", "cmd_son_takipçiyi_banla": "ban last follower",
         "log_msg_sent": "Sending Message", "log_title_upd": "Updating Title",
         "log_cat_upd": "Updating Category", "log_clip": "Taking Clip",
         "log_clear": "Clearing Chat", "log_play": "Playing Song",
         "log_stop": "Stopping Song", "log_skip": "Skipping Song",
-        "log_ban": "Banning", "log_timeout": "Timing out", "log_unban": "Unbanning",
+        "log_ban": "Banning", "log_timeout": "Timing out", "log_unban": "Unbanning", "log_ban_last": "Mass Ban Action", "log_timeout_last": "Mass Timeout Action",
         "log_shield_on": "Shield Mode ON", "log_shield_off": "Shield Mode OFF",
         "log_discord_msg": "Discord Message", "log_discord_mute": "Muting Everyone",
         "log_discord_unmute": "Unmuting Everyone", "log_discord_pull": "Pulling Everyone",
@@ -389,7 +465,8 @@ class MissxssPanel(ctk.CTk):
             self.ikonlar["star"] = create_fa_icon("\uf005", self.fa_font_path, color="#000000") 
             self.ikonlar["gear"] = create_fa_icon("\uf013", self.fa_font_path, color="#9b59b6") 
             self.ikonlar["globe"] = create_fa_icon("\uf0ac", self.fa_font_path, size=22, color="#bdc3c7")
-            self.ikonlar["envelope"] = create_fa_icon("\uf0e0", self.fa_font_path, color="#f1c40f") # Feedback ikonu
+            self.ikonlar["envelope"] = create_fa_icon("\uf0e0", self.fa_font_path, color="#f1c40f")
+            self.ikonlar["search"] = create_fa_icon("\uf002", self.fa_font_path, color="#000000")
             
             self.ikonlar["lbl_key"] = create_fa_icon("\uf084", self.fa_font_path, size=22, color="#f1c40f") 
             self.ikonlar["lbl_mic"] = create_fa_icon("\uf130", self.fa_font_path, size=22, color="#43B581") 
@@ -407,6 +484,7 @@ class MissxssPanel(ctk.CTk):
             self.ikonlar["lbl_robot"] = create_fa_icon("\uf544", self.fa_font_path, size=22, color="#a29bfe") 
             self.ikonlar["lbl_term"] = create_fa_icon("\uf120", self.fa_font_path, size=22, color="#43B581") 
             self.ikonlar["lbl_chart"] = create_fa_icon("\uf080", self.fa_font_path, size=22, color="#e74c3c") 
+            self.ikonlar["lbl_clock"] = create_fa_icon("\uf017", self.fa_font_path, size=22, color="#34dbeb") 
         else:
             print("FontAwesome dosyası bulunamadı, ikonlar yüklenmeyecek.")
 
@@ -421,10 +499,11 @@ class MissxssPanel(ctk.CTk):
             "muzik_baslat": {"isim_key": "hk_play_music", "fonksiyon": self.sarki_baslat},
             "muzik_durdur": {"isim_key": "hk_stop_music", "fonksiyon": self.sarki_durdur},
             "muzik_gec": {"isim_key": "hk_skip_music", "fonksiyon": self.sarki_gec},
-            "ai_temizle": {"isim_key": "hk_clear_ai", "fonksiyon": self.ai_hafiza_temizle}
+            "ai_temizle": {"isim_key": "hk_clear_ai", "fonksiyon": self.ai_hafiza_temizle},
+            "recent_action": {"isim_key": "hk_action_last", "fonksiyon": self.hizli_son_takipcileri_isle_kisayol}
         }
         
-        self.gercek_komutlar_keys = ["klip al", "kategori değiştir", "başlık", "sohbeti temizle", "müzik başlat", "müzik dur", "müzik geç", "kalkanı aç", "kalkanı kapat", "herkesi sustur", "herkesin sesini aç", "herkesi bu kanala çek"]
+        self.gercek_komutlar_keys = ["klip al", "kategori değiştir", "başlık", "sohbeti temizle", "müzik başlat", "müzik dur", "müzik geç", "kalkanı aç", "kalkanı kapat", "herkesi sustur", "herkesin sesini aç", "herkesi bu kanala çek", "son takipçiyi banla"]
 
         try:
             self.iconbitmap(resource_path("missxss.ico"))
@@ -446,6 +525,51 @@ class MissxssPanel(ctk.CTk):
 
         self.canli_istatistik_dongusu()
         self.otomatik_guncelleme_kontrolu()
+        self.baslangic_baglanti_kontrolu()
+
+    # --- BAĞLANTI SÜRESİ KONTROLÜ (YENİ) ---
+    def baslangic_baglanti_kontrolu(self):
+        def check():
+            guncel_api_key = load_api_key()
+            if not guncel_api_key: return
+            headers = {"Authorization": f"Bearer {guncel_api_key}", "Content-Type": "application/json"}
+            try:
+                response = requests.post(f"{BASE_URL}/v1/get-stream-meta", headers=headers, json={}, timeout=10)
+                if response.status_code in [200, 201]:
+                    veri = response.json()
+                    baglanti = veri.get("kick_last_connection", "-")
+                    self._baglanti_kontrol(baglanti)
+            except:
+                pass
+        threading.Thread(target=check, daemon=True).start()
+
+    def _baglanti_kontrol(self, baglanti_str):
+        if not baglanti_str or baglanti_str == "-": return
+        try:
+            tarih_str = baglanti_str.split("T")[0] if "T" in baglanti_str else baglanti_str
+            baglanti_tarihi = datetime.strptime(tarih_str, "%Y-%m-%d")
+            bugun = datetime.now()
+            if (bugun - baglanti_tarihi).days >= 25 and not getattr(self, 'baglanti_uyarisi_verildi', False):
+                self.baglanti_uyarisi_verildi = True
+                self.after(0, self._baglanti_uyarisi_gorsel)
+        except:
+            pass
+
+    def _baglanti_uyarisi_gorsel(self):
+        uyari_win = ctk.CTkToplevel(self)
+        uyari_win.title(self.T("conn_warn_title"))
+        uyari_win.geometry("450x200")
+        uyari_win.attributes("-topmost", True)
+        uyari_win.resizable(False, False)
+        
+        try: uyari_win.iconbitmap(resource_path("missxss.ico"))
+        except: pass
+
+        ctk.CTkLabel(uyari_win, text=self.T("conn_warn_title"), font=ctk.CTkFont(size=18, weight="bold"), text_color="#f1c40f").pack(pady=(20, 10))
+        
+        ctk.CTkLabel(uyari_win, text=self.T("conn_warn_txt"), font=ctk.CTkFont(size=14)).pack(pady=(0, 20))
+        
+        ctk.CTkButton(uyari_win, text=self.T("understood"), font=ctk.CTkFont(weight="bold"), fg_color="#e74c3c", hover_color="#c0392b", command=uyari_win.destroy, width=150).pack()
 
     # --- SESSİZ OTOMATİK GÜNCELLEME SİSTEMİ ---
     def otomatik_guncelleme_kontrolu(self):
@@ -504,6 +628,7 @@ class MissxssPanel(ctk.CTk):
 
         threading.Thread(target=self._dosyayi_indir_ve_kur, args=(link,), daemon=True).start()
 
+    # V2.1'DEKİ O ESKİ, TIKIR TIKIR ÇALIŞAN GÜNCELLEME MOTORU!
     def _dosyayi_indir_ve_kur(self, link):
         try:
             if not getattr(sys, 'frozen', False):
@@ -533,6 +658,7 @@ class MissxssPanel(ctk.CTk):
             temp_dir = os.environ.get('TEMP', mevcut_dizin)
             bat_yolu = os.path.join(temp_dir, "missxss_updater.bat")
             
+            # V2.1 SADE GÜNCELLEME KODU
             bat_icerik = f"""@echo off
 cd /d "{mevcut_dizin}"
 :dongu
@@ -616,7 +742,7 @@ del "%~f0"
                 "embeds": [{
                     "title": "📬 Yeni Geri Bildirim",
                     "description": mesaj,
-                    "color": 15844367, # Altın Sarısı
+                    "color": 15844367,
                     "footer": {"text": f"Sürüm: v{APP_VERSION}"}
                 }]
             }
@@ -677,8 +803,7 @@ del "%~f0"
         ctk.CTkButton(self.uyari_penceresi, text=self.T("eula_btn"), font=ctk.CTkFont(size=14, weight="bold"), fg_color="#43B581", hover_color="#3ca374", command=kabul_et, width=240, height=45).pack()
 
     def tamamen_kapat(self):
-        self.destroy()
-        sys.exit(0)
+        os._exit(0) # Programı %100 anında sonlandırıp dosya kilidini açar
 
     def bosluga_tiklama_kontrolu(self, event):
         try:
@@ -782,7 +907,7 @@ del "%~f0"
         for anahtar, veri in self.kisayol_tanimlari.items():
             satir = ctk.CTkFrame(liste_frame, fg_color="transparent")
             satir.pack(fill="x", pady=8)
-            ctk.CTkLabel(satir, text=self.T(veri["isim_key"]), font=ctk.CTkFont(size=14, weight="bold"), width=220, anchor="w").pack(side="left")
+            ctk.CTkLabel(satir, text=self.T(veri["isim_key"]), font=ctk.CTkFont(size=14, weight="bold"), width=300, anchor="w").pack(side="left")
             mevcut_tus = self.kisayollar.get(anahtar, self.T("hk_unassigned"))
             lbl_durum = ctk.CTkLabel(satir, text=mevcut_tus, font=ctk.CTkFont(size=14, weight="bold"), text_color="#00d2ff" if self.T("hk_unassigned") not in mevcut_tus else "#ff4757", anchor="w")
             lbl_durum.pack(side="left", padx=10, fill="x", expand=True)
@@ -824,6 +949,8 @@ del "%~f0"
         mevcut = self.kalkan_durumu.get()
         self.kalkan_durumu.set("on" if mevcut == "off" else "off")
         self.after(0, self.kalkan_tetikle)
+    def hizli_son_takipcileri_isle_kisayol(self):
+        self.after(0, self.son_takipcileri_isle)
 
     def ozel_komut_penceresi_ac(self):
         if self.ozel_komut_penceresi is not None and self.ozel_komut_penceresi.winfo_exists():
@@ -1026,7 +1153,6 @@ del "%~f0"
         self.kisayol_buton = ctk.CTkButton(self.sidebar_frame, text=self.T("hotkey"), image=self.ikonlar.get("keyboard"), command=self.kisayol_penceresi_ac, font=ctk.CTkFont(size=13, weight="bold"), fg_color="#2b2b2b", hover_color="#3d3d3d", height=30)
         self.kisayol_buton.pack(fill="x", padx=20, pady=(0, 5))
 
-        # --- YENİ: FEEDBACK BUTONU EKLENDİ ---
         self.feedback_buton = ctk.CTkButton(self.sidebar_frame, text=self.T("feedback"), image=self.ikonlar.get("envelope"), command=self.feedback_penceresi_ac, font=ctk.CTkFont(size=13, weight="bold"), fg_color="#2b2b2b", hover_color="#3d3d3d", height=30)
         self.feedback_buton.pack(fill="x", padx=20, pady=(0, 5))
 
@@ -1045,6 +1171,7 @@ del "%~f0"
         self.tab_ana = self.tabview.add(self.T("tab_main"))
         self.tab_dc = self.tabview.add(self.T("tab_dc"))
         self.tab_yayin = self.tabview.add(self.T("tab_stream"))
+        self.tab_izleme = self.tabview.add(self.T("tab_watch"))
 
         # ==========================================
         # 1. SEKME: ANA PANEL İÇERİĞİ
@@ -1100,6 +1227,7 @@ del "%~f0"
         self.kalkan_durumu = ctk.StringVar(value="off")
         self.kalkan_switch = ctk.CTkSwitch(self.mod_top_inner, text=self.T("shield"), variable=self.kalkan_durumu, onvalue="on", offvalue="off", command=self.kalkan_tetikle, font=ctk.CTkFont(size=12, weight="bold"), button_color="#ffffff", progress_color="#ff4757")
         self.kalkan_switch.pack(side="right")
+        
         self.mod_inner = ctk.CTkFrame(self.mod_frame, fg_color="transparent")
         self.mod_inner.pack(fill="x", padx=15, pady=10)
         self.kullanici_entry = ctk.CTkEntry(self.mod_inner, placeholder_text=self.T("usr_ph"))
@@ -1107,6 +1235,19 @@ del "%~f0"
         ctk.CTkButton(self.mod_inner, text=self.T("ban"), image=self.ikonlar.get("hammer"), fg_color="#ff4757", hover_color="#ff6b81", width=90, command=self.kullanici_banla).pack(side="left", padx=(0, 10))
         ctk.CTkButton(self.mod_inner, text=self.T("timeout"), image=self.ikonlar.get("clock"), fg_color="#ffa502", hover_color="#eccc68", width=100, command=self.kullanici_sustur).pack(side="left", padx=(0, 10))
         ctk.CTkButton(self.mod_inner, text=self.T("unban"), image=self.ikonlar.get("unlock"), fg_color="#43B581", hover_color="#3ca374", width=110, command=self.kullanici_unban).pack(side="left")
+
+        # Son Takipçi Banlama (Kutu + Buton)
+        self.mod_quick_inner = ctk.CTkFrame(self.mod_frame, fg_color="transparent")
+        self.mod_quick_inner.pack(fill="x", padx=15, pady=(0, 5))
+        
+        self.mod_count_entry = ctk.CTkEntry(self.mod_quick_inner, placeholder_text="Adet", width=60)
+        self.mod_count_entry.insert(0, "1")
+        self.mod_count_entry.pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(self.mod_quick_inner, text=self.T("ban_last"), image=self.ikonlar.get("hammer"), fg_color="#e74c3c", hover_color="#c0392b", command=self.son_takipcileri_isle).pack(side="left", fill="x", expand=True)
+
+        self.mod_warn_label = ctk.CTkLabel(self.mod_frame, text=self.T("ban_voice_warn"), font=ctk.CTkFont(size=11, slant="italic"), text_color="#A0A0A0", anchor="e")
+        self.mod_warn_label.pack(fill="x", padx=15, pady=(0, 10))
 
         # ==========================================
         # 2. SEKME: DİSCORD KONTROLCÜ
@@ -1181,12 +1322,14 @@ del "%~f0"
         self.stat_inner = ctk.CTkFrame(self.stat_frame, fg_color="transparent")
         self.stat_inner.pack(fill="x", padx=15, pady=10)
         
-        self.lbl_izleyici = ctk.CTkLabel(self.stat_inner, text=f"{self.T('viewers')} -", font=ctk.CTkFont(size=18, weight="bold"), text_color="#3498db")
+        self.lbl_izleyici = ctk.CTkLabel(self.stat_inner, text=f"{self.T('viewers')} -", font=ctk.CTkFont(size=16, weight="bold"), text_color="#3498db")
         self.lbl_izleyici.pack(side="left", expand=True)
-        self.lbl_takipci = ctk.CTkLabel(self.stat_inner, text=f"{self.T('followers')} -", font=ctk.CTkFont(size=18, weight="bold"), text_color="#2ecc71")
+        self.lbl_takipci = ctk.CTkLabel(self.stat_inner, text=f"{self.T('followers')} -", font=ctk.CTkFont(size=16, weight="bold"), text_color="#2ecc71")
         self.lbl_takipci.pack(side="left", expand=True)
-        self.lbl_kategori = ctk.CTkLabel(self.stat_inner, text=f"{self.T('category')} -", font=ctk.CTkFont(size=18, weight="bold"), text_color="#9b59b6")
+        self.lbl_kategori = ctk.CTkLabel(self.stat_inner, text=f"{self.T('category')} -", font=ctk.CTkFont(size=16, weight="bold"), text_color="#9b59b6")
         self.lbl_kategori.pack(side="left", expand=True)
+        self.lbl_baglanti = ctk.CTkLabel(self.stat_inner, text=f"{self.T('conn')} -", font=ctk.CTkFont(size=16, weight="bold"), text_color="#f1c40f")
+        self.lbl_baglanti.pack(side="left", expand=True)
 
         self.stream_meta_frame = ctk.CTkFrame(self.tab_yayin, corner_radius=10)
         self.stream_meta_frame.pack(fill="x", pady=(0, 10), padx=10)
@@ -1249,6 +1392,111 @@ del "%~f0"
         self.after(200, self.prompt_listesini_guncelle)
 
         # ==========================================
+        # 4. SEKME: İZLEME SÜRELERİ (YENİ - SADELEŞTİRİLMİŞ)
+        # ==========================================
+        # 4.1 İZLEME SÜRESİ EKLE/ÇIKAR
+        self.watch_frame = ctk.CTkFrame(self.tab_izleme, corner_radius=10)
+        self.watch_frame.pack(fill="x", pady=(10, 10), padx=10)
+        
+        ctk.CTkLabel(self.watch_frame, text=self.T("watch_title"), image=self.ikonlar.get("lbl_clock"), compound="left", font=ctk.CTkFont(size=14, weight="bold"), text_color="#34dbeb").pack(anchor="w", padx=15, pady=(10, 0))
+        
+        self.watch_inner1 = ctk.CTkFrame(self.watch_frame, fg_color="transparent")
+        self.watch_inner1.pack(fill="x", padx=15, pady=(15, 5))
+        
+        self.watch_platform_combo = ctk.CTkOptionMenu(self.watch_inner1, values=["Kick", "Twitch", "YouTube", "TikTok"], width=150)
+        self.watch_platform_combo.pack(side="left", padx=(0, 10))
+        
+        self.watch_mode_combo = ctk.CTkOptionMenu(self.watch_inner1, values=[self.T("watch_mode_add"), self.T("watch_mode_remove")], width=150)
+        self.watch_mode_combo.pack(side="left", padx=(0, 10))
+        
+        self.watch_user_entry = ctk.CTkEntry(self.watch_inner1, placeholder_text=self.T("watch_user_ph"))
+        self.watch_user_entry.pack(side="left", fill="x", expand=True)
+
+        self.watch_inner2 = ctk.CTkFrame(self.watch_frame, fg_color="transparent")
+        self.watch_inner2.pack(fill="x", padx=15, pady=(5, 15))
+        
+        self.watch_amount_entry = ctk.CTkEntry(self.watch_inner2, placeholder_text=self.T("watch_amount_ph"), width=150)
+        self.watch_amount_entry.pack(side="left", padx=(0, 10))
+        
+        # Gizlenecek: watch_day_entry
+        self.watch_day_entry = ctk.CTkEntry(self.watch_inner2, placeholder_text=self.T("watch_day_ph"))
+        
+        self.watch_btn = ctk.CTkButton(self.watch_inner2, text=self.T("watch_btn"), image=self.ikonlar.get("refresh"), fg_color="#34dbeb", text_color="black", hover_color="#2ebbc7", width=130, command=self.izleme_suresi_isle)
+        self.watch_btn.pack(side="left")
+
+        # 4.2 İZLEME SÜRESİ SORGULA (BİREYSEL)
+        self.get_watch_frame = ctk.CTkFrame(self.tab_izleme, corner_radius=10)
+        self.get_watch_frame.pack(fill="x", pady=(0, 10), padx=10)
+
+        ctk.CTkLabel(self.get_watch_frame, text=self.T("get_watch_title"), image=self.ikonlar.get("lbl_search"), compound="left", font=ctk.CTkFont(size=14, weight="bold"), text_color="#2ecc71").pack(anchor="w", padx=15, pady=(10, 0))
+
+        self.get_watch_inner1 = ctk.CTkFrame(self.get_watch_frame, fg_color="transparent")
+        self.get_watch_inner1.pack(fill="x", padx=15, pady=(15, 5))
+
+        self.get_watch_platform_combo = ctk.CTkOptionMenu(self.get_watch_inner1, values=["Kick", "Twitch", "YouTube", "TikTok"], width=150)
+        self.get_watch_platform_combo.pack(side="left", padx=(0, 10))
+
+        self.get_watch_user_entry = ctk.CTkEntry(self.get_watch_inner1, placeholder_text=self.T("watch_user_ph"))
+        self.get_watch_user_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+        # Gizlenecek: get_watch_day_entry
+        self.get_watch_day_entry = ctk.CTkEntry(self.get_watch_inner1, placeholder_text=self.T("watch_day_ph"), width=150)
+
+        self.get_watch_inner2 = ctk.CTkFrame(self.get_watch_frame, fg_color="transparent")
+        self.get_watch_inner2.pack(fill="x", padx=15, pady=(5, 15))
+
+        # Gizlenecek: get_watch_from_entry, get_watch_to_entry
+        self.get_watch_from_entry = ctk.CTkEntry(self.get_watch_inner2, placeholder_text=self.T("watch_date_from_ph"))
+        self.get_watch_to_entry = ctk.CTkEntry(self.get_watch_inner2, placeholder_text=self.T("watch_date_to_ph"))
+
+        self.get_watch_btn = ctk.CTkButton(self.get_watch_inner2, text=self.T("get_watch_btn"), image=self.ikonlar.get("search"), fg_color="#2ecc71", text_color="black", hover_color="#27ae60", width=130, command=self.izleme_suresi_getir)
+        self.get_watch_btn.pack(side="left")
+        
+        # 4.3 TOP İZLEYİCİLER (LİDERLİK TABLOSU)
+        self.top_watch_frame = ctk.CTkFrame(self.tab_izleme, corner_radius=10)
+        self.top_watch_frame.pack(fill="x", pady=(0, 10), padx=10)
+
+        ctk.CTkLabel(self.top_watch_frame, text=self.T("top_watch_title"), image=self.ikonlar.get("lbl_star"), compound="left", font=ctk.CTkFont(size=14, weight="bold"), text_color="#f1c40f").pack(anchor="w", padx=15, pady=(10, 0))
+
+        self.top_watch_inner1 = ctk.CTkFrame(self.top_watch_frame, fg_color="transparent")
+        self.top_watch_inner1.pack(fill="x", padx=15, pady=(15, 5))
+
+        self.top_platform_combo = ctk.CTkOptionMenu(self.top_watch_inner1, values=["Kick", "Twitch", "YouTube", "TikTok"], width=150)
+        self.top_platform_combo.pack(side="left", padx=(0, 10))
+
+        self.top_limit_entry = ctk.CTkEntry(self.top_watch_inner1, placeholder_text=self.T("top_limit_ph"), width=120)
+        self.top_limit_entry.insert(0, "20")
+        self.top_limit_entry.pack(side="left", padx=(0, 10))
+
+        # Gizlenecek: top_offset_entry, top_day_entry
+        self.top_offset_entry = ctk.CTkEntry(self.top_watch_inner1, placeholder_text=self.T("top_offset_ph"), width=120)
+        self.top_day_entry = ctk.CTkEntry(self.top_watch_inner1, placeholder_text=self.T("watch_day_ph"), width=150)
+
+        self.top_watch_inner2 = ctk.CTkFrame(self.top_watch_frame, fg_color="transparent")
+        self.top_watch_inner2.pack(fill="x", padx=15, pady=(5, 15))
+
+        # Gizlenecek: top_date_from_entry, top_date_to_entry
+        self.top_date_from_entry = ctk.CTkEntry(self.top_watch_inner2, placeholder_text=self.T("watch_date_from_ph"))
+        self.top_date_to_entry = ctk.CTkEntry(self.top_watch_inner2, placeholder_text=self.T("watch_date_to_ph"))
+
+        self.top_watch_btn = ctk.CTkButton(self.top_watch_inner2, text=self.T("top_watch_btn"), image=self.ikonlar.get("lbl_chart"), fg_color="#f1c40f", text_color="black", hover_color="#d4ac0d", width=130, command=self.top_izleyicileri_getir)
+        self.top_watch_btn.pack(side="left")
+
+        # --- YENİ DETAYLI ARAMA VE İPUCU ALANI ---
+        self.bottom_control_frame = ctk.CTkFrame(self.tab_izleme, fg_color="transparent")
+        self.bottom_control_frame.pack(fill="x", padx=15, pady=(5, 0))
+
+        self.detay_arama_var = ctk.BooleanVar(value=False)
+        self.detay_arama_switch = ctk.CTkSwitch(self.bottom_control_frame, text=self.T("detailed_search"), variable=self.detay_arama_var, command=self.toggle_detayli_arama, font=ctk.CTkFont(size=12, weight="bold"), progress_color="#f1c40f")
+        self.detay_arama_switch.pack(side="left")
+
+        self.date_hint_label = ctk.CTkLabel(self.bottom_control_frame, text=self.T("date_hint"), font=ctk.CTkFont(size=13, slant="italic", weight="bold"), text_color="#A0A0A0")
+        self.date_hint_label.pack(side="right")
+
+        # Başlangıçta gelişmiş seçenekleri gizle
+        self.toggle_detayli_arama()
+
+        # ==========================================
         # LOG EKRANI
         # ==========================================
         ctk.CTkLabel(self.main_frame, text=self.T("sys_log"), image=self.ikonlar.get("lbl_term"), compound="left", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", pady=(0, 5))
@@ -1258,6 +1506,54 @@ del "%~f0"
 
         if not self.api_entry.get(): self.log_yaz(self.T("err_api"))
         else: self.log_yaz(self.T("start_msg"))
+
+    def toggle_detayli_arama(self):
+        if self.detay_arama_var.get():
+            self.watch_day_entry.configure(placeholder_text=self.T("watch_day_ph"))
+            self.get_watch_day_entry.configure(placeholder_text=self.T("watch_day_ph"))
+            self.get_watch_from_entry.configure(placeholder_text=self.T("watch_date_from_ph"))
+            self.get_watch_to_entry.configure(placeholder_text=self.T("watch_date_to_ph"))
+            self.top_offset_entry.configure(placeholder_text=self.T("top_offset_ph"))
+            self.top_day_entry.configure(placeholder_text=self.T("watch_day_ph"))
+            self.top_date_from_entry.configure(placeholder_text=self.T("watch_date_from_ph"))
+            self.top_date_to_entry.configure(placeholder_text=self.T("watch_date_to_ph"))
+
+            self.watch_btn.pack_forget()
+            self.watch_day_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.watch_btn.pack(side="left")
+
+            self.get_watch_day_entry.pack(side="left", padx=(0, 10))
+            
+            self.get_watch_btn.pack_forget()
+            self.get_watch_from_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.get_watch_to_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.get_watch_btn.pack(side="left")
+
+            self.top_offset_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.top_day_entry.pack(side="left", padx=(0, 10))
+            
+            self.top_watch_btn.pack_forget()
+            self.top_date_from_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.top_date_to_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            self.top_watch_btn.pack(side="left")
+        else:
+            self.watch_day_entry.delete(0, "end")
+            self.get_watch_day_entry.delete(0, "end")
+            self.get_watch_from_entry.delete(0, "end")
+            self.get_watch_to_entry.delete(0, "end")
+            self.top_offset_entry.delete(0, "end")
+            self.top_day_entry.delete(0, "end")
+            self.top_date_from_entry.delete(0, "end")
+            self.top_date_to_entry.delete(0, "end")
+            
+            self.watch_day_entry.pack_forget()
+            self.get_watch_day_entry.pack_forget()
+            self.get_watch_from_entry.pack_forget()
+            self.get_watch_to_entry.pack_forget()
+            self.top_offset_entry.pack_forget()
+            self.top_day_entry.pack_forget()
+            self.top_date_from_entry.pack_forget()
+            self.top_date_to_entry.pack_forget()
 
     def canli_istatistik_dongusu(self):
         if getattr(self, "canli_takip_var_mi", None) and self.canli_takip_var_mi.get():
@@ -1277,10 +1573,176 @@ del "%~f0"
                 takipci = veri.get("followers_count", veri.get("follower_count", veri.get("followers", "-")))
                 kategori = veri.get("category", veri.get("game", "-"))
                 
+                baglanti = veri.get("kick_last_connection", "-")
+                if isinstance(baglanti, str) and "T" in baglanti:
+                    baglanti = baglanti.split("T")[0]
+                
                 self.after(0, lambda: self.lbl_izleyici.configure(text=f"{self.T('viewers')} {izleyici}"))
                 self.after(0, lambda: self.lbl_takipci.configure(text=f"{self.T('followers')} {takipci}"))
                 self.after(0, lambda: self.lbl_kategori.configure(text=f"{self.T('category')} {kategori}"))
+                self.after(0, lambda: self.lbl_baglanti.configure(text=f"{self.T('conn')} {baglanti}"))
         except Exception: pass
+
+    # --- BASİT GÖRÜNÜM OLUŞTURUCU ---
+    def _basit_metin_olustur(self, data):
+        if not data: return self.T("sv_not_found")
+        lines = []
+        liste_verisi = None
+        
+        # Dakikayı Yıl-Ay-Gün-Saat-Dakika formatına çeviren akıllı fonksiyon
+        def dk_formatla(sure):
+            try:
+                dk = int(sure)
+                if dk == 0: return f"0 {self.T('sv_min')}"
+                yol = dk // 525600
+                kalan = dk % 525600
+                ay = kalan // 43200
+                kalan %= 43200
+                gun = kalan // 1440
+                kalan %= 1440
+                saat = kalan // 60
+                dakika = kalan % 60
+                
+                parcalar = []
+                if yol > 0: parcalar.append(f"{yol} {self.T('sv_yr')}")
+                if ay > 0: parcalar.append(f"{ay} {self.T('sv_mo')}")
+                if gun > 0: parcalar.append(f"{gun} {self.T('sv_day')}")
+                if saat > 0: parcalar.append(f"{saat} {self.T('sv_hr')}")
+                if dakika > 0: parcalar.append(f"{dakika} {self.T('sv_min')}")
+                
+                return " ".join(parcalar) if parcalar else f"0 {self.T('sv_min')}"
+            except:
+                return f"{sure} {self.T('sv_min')}"
+
+        if isinstance(data, dict):
+            # 1. Bireysel İzleme Süresi
+            if "watch_time" in data and "message_count" in data:
+                isim = data.get("displayname", data.get("username", self.T("sv_unknown")))
+                sure = data.get("watch_time", 0)
+                msg = data.get("message_count", 0)
+                lines.append(f"{self.T('sv_user')} {isim}")
+                lines.append(f"{self.T('sv_watch_time')} {dk_formatla(sure)}")
+                lines.append(f"{self.T('sv_msg_count')} {msg}")
+                return "\n".join(lines)
+                
+            # 2. Yayın Bilgileri
+            if "viewer_count" in data or "followers_count" in data:
+                kat = data.get("category", data.get("game", "-"))
+                izleyici = data.get("viewer_count", data.get("viewers", "-"))
+                takipci = data.get("followers_count", "-")
+                baslik = data.get("title", "-")
+                yayinda = self.T("sv_yes") if data.get("is_live_any", data.get("is_live", False)) else self.T("sv_no")
+                lines.append(f"{self.T('sv_is_live')} {yayinda}")
+                lines.append(f"{self.T('sv_cat')} {kat}")
+                lines.append(f"{self.T('sv_viewers')} {izleyici}")
+                lines.append(f"{self.T('sv_followers')} {takipci}")
+                lines.append(f"{self.T('sv_title')} {baslik}")
+                return "\n".join(lines)
+                
+            # 3. Son Aktiviteler (Eğer dict olarak geliyorsa latest_followers/latest_subscribers)
+            if "latest_followers" in data or "latest_subscribers" in data:
+                aktiviteler = []
+                if "latest_followers" in data and isinstance(data["latest_followers"], list):
+                    aktiviteler.extend(data["latest_followers"])
+                if "latest_subscribers" in data and isinstance(data["latest_subscribers"], list):
+                    aktiviteler.extend(data["latest_subscribers"])
+                    
+                if not aktiviteler: return self.T("sv_no_act")
+                
+                for i, item in enumerate(aktiviteler):
+                    isim = item.get("displayname", item.get("username", self.T("sv_unknown")))
+                    tip = str(item.get("type", item.get("action", ""))).lower()
+                    if "sub" in tip: 
+                        if "renew" in tip: tip_yazi = self.T("sv_sub_renew")
+                        elif "gift" in tip: tip_yazi = self.T("sv_sub_gift")
+                        else: tip_yazi = self.T("sv_sub_type")
+                    else: 
+                        tip_yazi = self.T("sv_follower_type")
+                    lines.append(f"{i+1}. 👤 {isim} ({tip_yazi})")
+                return "\n".join(lines)
+
+            # İçinde liste olanları bul (Top listeler, aktiviteler vs.)
+            for v in data.values():
+                if isinstance(v, list):
+                    liste_verisi = v
+                    break
+                    
+        # Eğer veri en dıştan liste olarak geldiyse
+        if liste_verisi is None and isinstance(data, list):
+            liste_verisi = data
+        
+        if liste_verisi is not None:
+            if len(liste_verisi) == 0: return self.T("sv_empty")
+            
+            if isinstance(liste_verisi[0], dict):
+                # A. Top İzleyiciler
+                if "watch_time" in liste_verisi[0] or "amount" in liste_verisi[0]:
+                    for i, item in enumerate(liste_verisi):
+                        isim = item.get("displayname", item.get("username", self.T("sv_unknown")))
+                        sure = item.get("watch_time", item.get("amount", 0))
+                        lines.append(f"🏆 {i+1}. {isim} - {dk_formatla(sure)}")
+                    return "\n".join(lines)
+                
+                # B. Kick Aboneleri
+                elif any(k in str(liste_verisi[0]).lower() for k in ["tier", "months", "subscriber", "kick_username", "subscription_type"]):
+                    for i, item in enumerate(liste_verisi):
+                        isim = self.T("sv_unknown")
+                        if isinstance(item.get("subscriber"), dict):
+                            isim = item["subscriber"].get("username", item["subscriber"].get("slug", self.T("sv_unknown")))
+                        elif isinstance(item.get("subscriber"), str):
+                            isim = item["subscriber"]
+                        elif isinstance(item.get("user"), dict):
+                            isim = item["user"].get("username", item["user"].get("slug", self.T("sv_unknown")))
+                        else:
+                            isim = item.get("kick_displayname", item.get("kick_username", item.get("username", item.get("name", self.T("sv_unknown")))))
+                        lines.append(f"⭐ {i+1}. {isim}")
+                    return "\n".join(lines)
+                    
+                # C. Son Aktiviteler (Eğer doğrudan liste gelirse)
+                elif "type" in liste_verisi[0] and ("follower" in str(liste_verisi[0].get("type", "")).lower() or "sub" in str(liste_verisi[0].get("type", "")).lower()):
+                    for i, item in enumerate(liste_verisi):
+                        isim = item.get("displayname", item.get("username", self.T("sv_unknown")))
+                        tip = str(item.get("type", "")).lower()
+                        if "sub" in tip: 
+                            if "renew" in tip: tip_yazi = self.T("sv_sub_renew")
+                            elif "gift" in tip: tip_yazi = self.T("sv_sub_gift")
+                            else: tip_yazi = self.T("sv_sub_type")
+                        else: 
+                            tip_yazi = self.T("sv_follower_type")
+                        lines.append(f"🔔 {i+1}. {isim} ({tip_yazi})")
+                    return "\n".join(lines)
+
+                # D. Moderasyon Kayıtları
+                elif any(k in liste_verisi[0] for k in ["action", "moderator", "banned_by", "duration"]) or ("type" in liste_verisi[0] and liste_verisi[0].get("type") in ["ban", "timeout", "unban"]):
+                    for i, item in enumerate(liste_verisi):
+                        hedef = item.get("target", item.get("username", item.get("user", self.T("sv_unknown"))))
+                        if isinstance(hedef, dict): hedef = hedef.get("username", self.T("sv_unknown"))
+                        aksiyon = item.get("action", item.get("type", "İşlem"))
+                        sure = item.get("duration", "")
+                        sebep = item.get("reason", "")
+                        
+                        detay = ""
+                        if sure: detay += f"{sure}dk "
+                        if sebep: detay += f"[{sebep}]"
+                        
+                        lines.append(f"🛡️ {i+1}. {hedef} -> {str(aksiyon).upper()} {detay}")
+                    return "\n".join(lines)
+                
+                # E. Genel Liste Kurtarıcı
+                else:
+                    for i, item in enumerate(liste_verisi):
+                        isim = item.get("username", item.get("displayname", item.get("target", item.get("name", self.T("sv_unknown")))))
+                        if isinstance(isim, dict): isim = isim.get("username", self.T("sv_unknown"))
+                        tip = item.get("type", item.get("action", item.get("status", "")))
+                        satir = f"🔸 {i+1}. {isim}"
+                        if tip: satir += f" - {tip}"
+                        lines.append(satir)
+                    return "\n".join(lines)
+        
+        if isinstance(data, dict) and data.get("success") == True and len(data) <= 2:
+            return self.T("sv_success")
+            
+        return self.T("sv_details")
 
     def _veriyi_turkcelestir(self, data, indent=0):
         if isinstance(data, list):
@@ -1303,14 +1765,26 @@ del "%~f0"
                 "Months": "Ay (Süre)", "Guild Id": "Sunucu ID", "Channel Id": "Kanal ID",
                 "Log Channel Id": "Log Kanalı ID", "Status": "Durum", "Bot Connected": "Bot Bağlantısı",
                 "Permissions": "Yetkiler", "Message": "Mesaj", "Action": "Aksiyon", 
-                "Target": "Hedef", "Count": "Adet/Sayı", "Amount": "Miktar", "Currency": "Para Birimi",
+                "Target": "Hedef", "Count": "Adet/Sayı", "Amount": "Miktar (Dk)", "Currency": "Para Birimi",
                 "Is Gift": "Hediye Mi?", "Gifter": "Hediye Eden", "Total": "Toplam",
+                "Total Watch Time": "Toplam İzleme Süresi (Dk)",
+                "Watch Time": "İzleme Süresi",
+                "Success": "Başarılı", "Displayname": "Görünen Ad", "Query Mode": "Sorgu Modu", 
+                "Day": "Gün", "Date From": "Başlangıç Tarihi", "Date To": "Bitiş Tarihi", 
+                "Watch Time Unit": "Süre Birimi", "Message Count": "Mesaj Sayısı", 
+                "Channel": "Kanal", "Kick Channel": "Kick Kanalı", "Twitch Channel": "Twitch Kanalı", 
+                "Category Id": "Kategori ID", "Followers Count": "Takipçi Sayısı", 
+                "Is Live Any": "Yayında (Herhangi)", "Is Live Kick": "Yayında (Kick)", 
+                "Is Live Twitch": "Yayında (Twitch)", "Is Live Tiktok": "Yayında (TikTok)", 
+                "Is Live Youtube": "Yayında (YouTube)", "Started At": "Başlama Tarihi", 
+                "Latest Followers": "Son Takipçiler",
                 "Active": "Aktif", "Expired": "Süresi Biten", "Broadcaster": "Yayıncı",
                 "Streamer": "Yayıncı", "Role": "Rol", "Created At": "Oluşturulma Tarihi", 
                 "Updated At": "Güncelleme Tarihi", "Banned At": "Banlanma Tarihi", 
                 "Banned By": "Banlayan", "Avatar": "Profil Fotoğrafı",
                 "Banner": "Afiş", "Bio": "Hakkında", "Socials": "Sosyal Medya", "Links": "Linkler",
-                "Platform": "Platform"
+                "Platform": "Platform",
+                "Kick Last Connection": "Son Kick Bağlantısı"
             }
             for key, value in data.items():
                 k_lower = key.lower()
@@ -1329,6 +1803,8 @@ del "%~f0"
                         if k_lower == "platform": value = "Kick"
                         else: value = "Sesten/Yayından Atma (Kick)" if self.current_lang == "tr" else "Kick"
                     elif val_lower == "mute": value = "Susturma" if self.current_lang == "tr" else "Mute"
+                    elif "T" in value and value.endswith("Z") and len(value) >= 20: 
+                        value = value.split("T")[0]
                 elif isinstance(value, bool):
                     if self.current_lang == "tr": value = "Evet" if value else "Hayır"
                     else: value = "True" if value else "False"
@@ -1345,29 +1821,44 @@ del "%~f0"
 
         self.sonuc_penceresi = ctk.CTkToplevel(self)
         self.sonuc_penceresi.title(f"{self.T('query_res')}{baslik}")
-        self.sonuc_penceresi.geometry("600x500")
+        self.sonuc_penceresi.geometry("600x550")
         self.sonuc_penceresi.attributes("-topmost", True)
         self.sonuc_penceresi.resizable(False, False) 
         
         try: self.sonuc_penceresi.after(200, lambda: self.sonuc_penceresi.iconbitmap(resource_path("missxss.ico")))
         except: pass
 
-        ctk.CTkLabel(self.sonuc_penceresi, text=f"📊 {baslik}", font=ctk.CTkFont(size=18, weight="bold"), text_color="#00d2ff").pack(pady=(15, 10))
+        ctk.CTkLabel(self.sonuc_penceresi, text=f"📊 {baslik}", font=ctk.CTkFont(size=18, weight="bold"), text_color="#00d2ff").pack(pady=(15, 5))
 
-        sonuc_kutusu = ctk.CTkTextbox(self.sonuc_penceresi, width=560, height=380, font=ctk.CTkFont("Consolas", size=13))
-        sonuc_kutusu.pack(padx=20, pady=10)
+        self.detay_goster_var = ctk.BooleanVar(value=False)
+
+        sonuc_kutusu = ctk.CTkTextbox(self.sonuc_penceresi, width=560, height=360, font=ctk.CTkFont("Consolas", size=13))
+        sonuc_kutusu.pack(padx=20, pady=(5, 10))
         
         try:
             islenmis_satirlar = self._veriyi_turkcelestir(ham_veri)
-            formatli_metin = "\n".join(islenmis_satirlar)
-            if not formatli_metin.strip(): formatli_metin = "Data not found / Veri bulunamadı."
+            self.detayli_metin = "\n".join(islenmis_satirlar)
+            if not self.detayli_metin.strip(): self.detayli_metin = "Data not found / Veri bulunamadı."
+            self.basit_metin = self._basit_metin_olustur(ham_veri)
         except Exception as e:
-            formatli_metin = f"Error formatting data:\n{str(e)}\n\nRaw Data:\n{str(ham_veri)}"
+            self.detayli_metin = f"Error formatting data:\n{str(e)}\n\nRaw Data:\n{str(ham_veri)}"
+            self.basit_metin = self.T("sv_err")
 
-        sonuc_kutusu.insert("0.0", formatli_metin)
-        sonuc_kutusu.configure(state="disabled")
+        def metni_guncelle():
+            sonuc_kutusu.configure(state="normal")
+            sonuc_kutusu.delete("0.0", "end")
+            if self.detay_goster_var.get():
+                sonuc_kutusu.insert("0.0", self.detayli_metin)
+            else:
+                sonuc_kutusu.insert("0.0", self.basit_metin)
+            sonuc_kutusu.configure(state="disabled")
 
-        ctk.CTkButton(self.sonuc_penceresi, text=self.T("close"), command=self.sonuc_penceresi.destroy, fg_color="#ff4757", hover_color="#ff6b81", width=120).pack(pady=(5, 10))
+        cb = ctk.CTkCheckBox(self.sonuc_penceresi, text=self.T("show_details"), variable=self.detay_goster_var, command=metni_guncelle, font=ctk.CTkFont(weight="bold"))
+        cb.pack(pady=(0, 10))
+
+        metni_guncelle()
+
+        ctk.CTkButton(self.sonuc_penceresi, text=self.T("close"), command=self.sonuc_penceresi.destroy, fg_color="#ff4757", hover_color="#ff6b81", width=120).pack(pady=(0, 10))
 
     def log_yaz(self, mesaj): self.after(0, self._log_yaz_gorsel, mesaj)
     def _log_yaz_gorsel(self, mesaj):
@@ -1395,7 +1886,7 @@ del "%~f0"
             self.log_yaz(f"{req_text}: {islem_adi}...")
             response = requests.post(url, headers=headers, json=payload if payload else {})
             if response.status_code in [200, 201]: 
-                ozel_sorgular = ["/v1/get-stream-meta", "/v1/get-kick-subscribers", "/v1/get-recent-activity", "/v1/get-moderation-log", "/v1/discord-status"]
+                ozel_sorgular = ["/v1/get-stream-meta", "/v1/get-kick-subscribers", "/v1/get-recent-activity", "/v1/get-moderation-log", "/v1/discord-status", "/v1/get-watch-time", "/v1/get-watch-time-top"]
                 if endpoint in ozel_sorgular and response.text:
                     try:
                         veri = response.json()
@@ -1647,6 +2138,123 @@ del "%~f0"
         self.api_istegi_yap(f"{self.T('log_unban')} {kullanici}", "/v1/unban-user", {"username": kullanici})
         self.kullanici_entry.delete(0, "end")
         self.focus_set()
+        
+    def son_takipcileri_isle(self):
+        try:
+            count = int(self.mod_count_entry.get().strip())
+        except ValueError:
+            count = 1
+            
+        payload = {
+            "action": "ban",
+            "offset": 1,
+            "count": count,
+            "reason": "Panel - Manuel UI"
+        }
+        self.api_istegi_yap(f"{self.T('log_ban_last')} ({count} kişi)", "/v1/ban-recent-followers", payload)
+        self.focus_set()
+        
+    def hizli_son_takipcileri_isle_kisayol(self):
+        self.after(0, self.son_takipcileri_isle)
+
+    def izleme_suresi_isle(self):
+        username = self.watch_user_entry.get().strip()
+        if not username:
+            self.log_yaz("⚠️ Username is required!" if self.current_lang == "en" else "⚠️ Kullanıcı Adı zorunludur!")
+            return
+            
+        try:
+            amount = int(self.watch_amount_entry.get().strip())
+        except ValueError:
+            self.log_yaz("⚠️ Amount must be a number!" if self.current_lang == "en" else "⚠️ Miktar rakam olmalıdır!")
+            return
+
+        platform = self.watch_platform_combo.get()
+        
+        mode_str = self.watch_mode_combo.get()
+        if mode_str in ["Ekle", "Add"]:
+            mode_val = "add"
+        else:
+            mode_val = "remove"
+
+        payload = {
+            "platform": platform,
+            "mode": mode_val,
+            "amount": amount
+        }
+        
+        if username.isdigit():
+            payload["userid"] = username
+        else:
+            payload["username"] = username
+            
+        if self.detay_arama_var.get():
+            day = self.watch_day_entry.get().strip()
+            if day: payload["day"] = day
+
+        self.api_istegi_yap(f"{self.T('log_watch')} ({username})", "/v1/adjust-watch-time", payload)
+        
+        self.watch_user_entry.delete(0, "end")
+        self.watch_amount_entry.delete(0, "end")
+        self.watch_day_entry.delete(0, "end")
+        self.focus_set()
+
+    def izleme_suresi_getir(self):
+        platform = self.get_watch_platform_combo.get()
+        kullanici = self.get_watch_user_entry.get().strip()
+
+        payload = {"platform": platform}
+        
+        if kullanici:
+            if kullanici.isdigit():
+                payload["userid"] = kullanici
+            else:
+                payload["username"] = kullanici
+                
+        if self.detay_arama_var.get():
+            gun = self.get_watch_day_entry.get().strip()
+            tarih_bas = self.get_watch_from_entry.get().strip()
+            tarih_bit = self.get_watch_to_entry.get().strip()
+            
+            if gun: payload["day"] = gun
+            if tarih_bas and tarih_bit:
+                payload["date_from"] = tarih_bas
+                payload["date_to"] = tarih_bit
+
+        self.api_istegi_yap(f"{self.T('get_watch_title')} ({kullanici if kullanici else 'Genel'})", "/v1/get-watch-time", payload)
+        self.focus_set()
+
+    def top_izleyicileri_getir(self):
+        platform = self.top_platform_combo.get()
+        limit_str = self.top_limit_entry.get().strip()
+
+        try: 
+            limit = int(limit_str) if limit_str else 20
+        except ValueError:
+            self.log_yaz("⚠️ Limit rakam olmalıdır!" if self.current_lang == "tr" else "⚠️ Limit must be a number!")
+            return
+            
+        payload = {"platform": platform, "limit": limit}
+        
+        if self.detay_arama_var.get():
+            offset_str = self.top_offset_entry.get().strip()
+            try: offset = int(offset_str) if offset_str else 0
+            except ValueError:
+                self.log_yaz("⚠️ Offset rakam olmalıdır!" if self.current_lang == "tr" else "⚠️ Offset must be a number!")
+                return
+            
+            gun = self.top_day_entry.get().strip()
+            tarih_bas = self.top_date_from_entry.get().strip()
+            tarih_bit = self.top_date_to_entry.get().strip()
+            
+            payload["offset"] = offset
+            if gun: payload["day"] = gun
+            if tarih_bas and tarih_bit:
+                payload["date_from"] = tarih_bas
+                payload["date_to"] = tarih_bit
+
+        self.api_istegi_yap(f"{self.T('top_watch_title').strip()} ({platform})", "/v1/get-watch-time-top", payload)
+        self.focus_set()
 
     def ses_gecis_yap(self):
         if not self.dinleme_aktif:
@@ -1714,11 +2322,19 @@ del "%~f0"
             self.after(0, self.discord_ses_pull_all)
             return
             
-        moderasyon_kelimeleri = ["ban", "sustur", "uçur", "timeout", "kick", "mute user"]
-        for mod_kelime in moderasyon_kelimeleri:
-            if mod_kelime in asil_komut:
-                self.log_yaz(f"⚠️ Warning: Ban/Timeout disabled for voice.")
-                return
+        guvenli_ban_komutlari = ["son takipçiyi banla", "son takip edeni banla", "ban last follower"]
+        guvenli_mi = False
+        for gbk in guvenli_ban_komutlari:
+            if gbk in asil_komut:
+                guvenli_mi = True
+                break
+                
+        if not guvenli_mi:
+            moderasyon_kelimeleri = ["ban", "sustur", "uçur", "timeout", "kick", "mute user"]
+            for mod_kelime in moderasyon_kelimeleri:
+                if mod_kelime in asil_komut:
+                    self.log_yaz(f"⚠️ Warning: Targeted Ban/Timeout disabled for voice.")
+                    return
 
         eslesen_anahtar = None; komut_verisi = None
         for anahtar, veri in KOMUT_HARITASI.items():
