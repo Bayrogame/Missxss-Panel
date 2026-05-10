@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>🎙️ Missxss Sesli Kontrol Paneli v2.1</h1>
-  <h2>🎙️ Missxss Voice Control Panel v2.1</h2>
+  <h1>🎙️ Missxss Sesli Kontrol Paneli</h1>
+  <h2>🎙️ Missxss Voice Control Panel</h2>
   <p><b>Yapay Zeka Destekli Sesli Yayın ve Discord Yönetim Paneli</b></p>
   <p><i>AI-Powered Voice-Controlled Stream and Discord Management Panel</i></p>
 </div>
